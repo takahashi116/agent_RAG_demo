@@ -6,9 +6,7 @@ const CONFIG = {
     WORKFLOW_ID: 'wf_694cd55399788190aaa361dc76a0775c09027f6e886535b0',
 
     // API Endpoints
-    // Attempting to use the new Responses API for Agent integration.
-    // If this fails, standard Chat Completions (v1/chat/completions) might be needed,
-    // but that wouldn't support the specific "Workflow".
+    // Using the new Responses API for Agent integration.
     API_ENDPOINT: 'https://api.openai.com/v1/responses',
 
     STORAGE_KEY: 'openai_agent_chat_api_key',
@@ -247,12 +245,12 @@ async function sendMessage(userMessage) {
 
         console.log('Sending Request with Workflow ID:', CONFIG.WORKFLOW_ID);
 
-        // Updated Request Body for Responses API / ChatKit Agent
+        // Updated Request Body for Responses API
+        // FIX: Changed parameter 'messages' to 'input' as per API requirements
         const requestBody = {
             model: CONFIG.MODEL,
-            workflow_id: CONFIG.WORKFLOW_ID, // Placed at root level
-            messages: messages, // Standard chat history
-            // input: messages, // Alternative: some versions of Responses API might use 'input'
+            workflow_id: CONFIG.WORKFLOW_ID, // Root level
+            input: messages, // Correct parameter name for Responses API
             stream: false
         };
 
@@ -272,19 +270,15 @@ async function sendMessage(userMessage) {
 
             let errorMessage = `API Error: ${response.status}`;
 
-            // Try to parse error
             try {
                 const errorData = JSON.parse(errorRaw);
                 errorMessage = errorData.error?.message || errorMessage;
             } catch (e) {
-                // If text/html error (like 404), use raw text snippet
                 errorMessage += ` - ${errorRaw.substring(0, 100)}`;
             }
 
-            if (response.status === 404) {
-                errorMessage = "Endpoint or Workflow ID not found. Verification needed.";
-            } else if (response.status === 0 || response.status === 403) {
-                errorMessage = "Connection refused. Possible CORS error on GitHub Pages.";
+            if (response.status === 400 && errorMessage.includes("parameter")) {
+                errorMessage += " (API Parameter mismatch)";
             }
 
             throw new Error(errorMessage);
@@ -315,7 +309,7 @@ async function sendMessage(userMessage) {
             }
         }
 
-        // Fallback to standard Chat Completions format
+        // Fallback to various response formats
         if (!assistantMessage && data.choices && data.choices[0]) {
             assistantMessage = data.choices[0].message?.content || data.choices[0].text || '';
         }
