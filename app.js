@@ -2,11 +2,13 @@
 // Configuration
 // ============================
 const CONFIG = {
-    // OpenAI Agent Builder Workflow ID
+    // Workflow ID is used for ChatKit UI integration, not direct API calls.
+    // Keeping it here for reference/future implementation.
     WORKFLOW_ID: 'wf_694cd55399788190aaa361dc76a0775c09027f6e886535b0',
 
     // API Endpoints
-    // Using the new Responses API for Agent integration.
+    // Using the new Responses API.
+    // Note: workflow_id is NOT supported as a parameter here.
     API_ENDPOINT: 'https://api.openai.com/v1/responses',
 
     STORAGE_KEY: 'openai_agent_chat_api_key',
@@ -243,14 +245,14 @@ async function sendMessage(userMessage) {
             content: msg.content
         }));
 
-        console.log('Sending Request with Workflow ID:', CONFIG.WORKFLOW_ID);
+        console.log('Sending Request. Workflow ID concept removed for direct API Compatibility.');
 
         // Updated Request Body for Responses API
-        // FIX: Changed parameter 'messages' to 'input' as per API requirements
+        // FIX: Removed workflow_id (it is a ChatKit library identifier, not an API parameter)
+        // FIX: Kept 'input' parameter logic
         const requestBody = {
             model: CONFIG.MODEL,
-            workflow_id: CONFIG.WORKFLOW_ID, // Root level
-            input: messages, // Correct parameter name for Responses API
+            input: messages,
             stream: false
         };
 
@@ -277,8 +279,9 @@ async function sendMessage(userMessage) {
                 errorMessage += ` - ${errorRaw.substring(0, 100)}`;
             }
 
-            if (response.status === 400 && errorMessage.includes("parameter")) {
-                errorMessage += " (API Parameter mismatch)";
+            // Provide user-friendly hints based on status
+            if (response.status === 404) {
+                errorMessage += " (Endpoint not found. Check if you have access to Responses API beta)";
             }
 
             throw new Error(errorMessage);
@@ -306,6 +309,16 @@ async function sendMessage(userMessage) {
                 }
             } else if (typeof data.output === 'string') {
                 assistantMessage = data.output;
+            }
+
+            // Handle multimodal output items
+            if (Array.isArray(data.output)) {
+                const textItems = data.output
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text);
+                if (textItems.length > 0) {
+                    assistantMessage = textItems.join('\n');
+                }
             }
         }
 
